@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Minecraft: Story Mode Web Engine</title>
+    <style>
+        @import url('https://googleapis.com');
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+        }
+
+        body {
+            background-color: #0b0b0f;
+            color: #fff;
+            font-family: 'Press Start 2P', monospace;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            min-height: 100vh;
+            overflow: hidden;
+        }
+
+        .game-container {
+            position: relative;
+            width: 95vw;
+            max-width: 960px;
+            aspect-ratio: 16 / 9;
+            background: #000;
+            border: 6px solid #333;
+            box-shadow: inset 0 0 40px rgba(0,0,0,0.9), 0 12px 36px rgba(0,0,0,0.8);
+            overflow: hidden;
+        }
+
+        .scene-background {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            transition: background 0.6s cubic-bezier(0.25, 1, 0.5, 1);
+        }
+
+        .hud-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 4;
+            display: flex;
+            flex-direction: column;
+            justify-content: flex-end;
+            padding-bottom: 4%;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+
+        .hud-overlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        .dialogue-container {
+            position: absolute;
+            bottom: 22%;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 3;
+            width: 85%;
+            background: rgba(0, 0, 0, 0.65);
+            border: 3px solid rgba(255,255,255,0.12);
+            padding: 16px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+        }
+
+        .name-tag {
+            font-size: 11px;
+            margin-bottom: 8px;
+            letter-spacing: 1px;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .subtitle-box {
+            font-size: 11px;
+            line-height: 1.8;
+            text-shadow: 2px 2px 0px #000;
+        }
+
+        .choice-grid {
+            display: grid;
+            grid-template-columns: 1fr 160px 1fr;
+            grid-template-rows: auto auto;
+            gap: 12px;
+            width: 90%;
+            margin: 0 auto 20px auto;
+        }
+
+        .choice-btn {
+            background-color: rgba(15, 15, 20, 0.92);
+            border: 4px solid #fff;
+            color: #eee;
+            font-family: 'Press Start 2P', monospace;
+            font-size: 9px;
+            padding: 16px 12px;
+            cursor: pointer;
+            text-align: left;
+            text-transform: uppercase;
+            box-shadow: inset -4px -4px 0px #000, inset 4px 4px 0px rgba(255,255,255,0.15), 0 4px 10px rgba(0,0,0,0.4);
+            transition: all 0.1s ease;
+        }
+
+        .choice-btn:hover {
+            color: #ffff55; 
+            background-color: rgba(35, 35, 45, 0.95);
+            transform: scale(1.02);
+            border-color: #ffff55;
+        }
+
+        .btn-top { grid-column: 2 / 3; grid-row: 1; text-align: center; }
+        .btn-left { grid-column: 1; grid-row: 2; }
+        .btn-bottom { grid-column: 2 / 3; grid-row: 2; text-align: center; opacity: 0.4; } 
+        .btn-right { grid-column: 3; grid-row: 2; text-align: right; }
+
+        .timer-container {
+            width: 45%;
+            height: 10px;
+            background-color: rgba(0, 0, 0, 0.7);
+            border: 3px solid #444;
+            margin: 0 auto;
+            position: relative;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.5);
+        }
+
+        .timer-bar {
+            height: 100%;
+            width: 100%;
+            background: repeating-linear-gradient(-45deg, #ffaa00, #ffaa00 8px, #ffcc00 8px, #ffcc00 16px);
+            transform-origin: left;
+        }
+
+        .timer-bar.running {
+            animation: countdown 5s linear forwards;
+        }
+
+        @keyframes countdown {
+            from { transform: scaleX(1); }
+            to { transform: scaleX(0); }
+        }
+
+        .meta-hud {
+            position: absolute;
+            top: 15px;
+            left: 20px;
+            font-size: 8px;
+            color: rgba(255,255,255,0.4);
+            z-index: 5;
+            text-shadow: 1px 1px 0px #000;
+        }
+
+        .dev-panel { margin-top: 18px; }
+        .dev-btn {
+            background-color: #222; color: #aaa; border: 2px solid #444;
+            padding: 8px 12px; cursor: pointer; font-family: 'Press Start 2P', monospace; font-size: 8px;
+        }
+        .dev-btn:hover { background-color: #333; color: #fff; }
+    </style>
+</head>
+<body>
+
+    <div class="meta-hud">MINECRAFT: STORY MODE | Ep 1 Engine Core v1.0.1</div>
+
+    <div class="game-container">
+        <div id="scene-bg" class="scene-background"></div>
+        
+        <div class="dialogue-container">
+            <div id="speaker-name" class="name-tag"></div>
+            <div id="subtitle" class="subtitle-box">Initializing Engine...</div>
+        </div>
+
+        <div id="hud" class="hud-overlay">
+            <div class="choice-grid">
+                <button class="choice-btn btn-top" onclick="makeChoice(0)" id="opt-top">Option Top</button>
+                <button class="choice-btn btn-left" onclick="makeChoice(1)" id="opt-left">Option Left</button>
+                <button class="choice-btn btn-right" onclick="makeChoice(2)" id="opt-right">Option Right</button>
+                <button class="choice-btn btn-bottom" disabled id="opt-silent">[...]</button>
+            </div>
+            <div class="timer-container">
+                <div id="timer-bar" class="timer-bar"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="dev-panel">
+        <button class="dev-btn" onclick="restartStory()">🔄 RESTART SCENE</button>
+    </div>
+
+    <script>
+        const colors = { jesse: '#55ff55', axel: '#ffaa00', olivia: '#ff55ff', narrator: '#aaaaaa' };
+
+        const storyTree = {
+            start: {
+                speaker: "Narrator",
+                color: colors.narrator,
+                subtitle: "'Nothing built lasts forever. And each legend, no matter how great, fades with time...'",
+                background: "linear-gradient(0deg, #09090d 0%, #020204 100%)",
+                hasChoices: false,
+                nextScene: "intro_dialogue"
+            },
+            intro_dialogue: {
+                speaker: "Jesse",
+                color: colors.jesse,
+                subtitle: "'Hey, Axel! Did you finish packing your building materials for EnderCon yet?'",
+                background: "linear-gradient(0deg, #131b2e 0%, #060912 100%)",
+                hasChoices: true,
+                choices: [
+                    { text: "Yeah, fully loaded!", target: "axel_positive" },
+                    { text: "Wait, we needed blocks?!", target: "axel_panicked" },
+                    { text: "Where is Olivia?", target: "olivia_locate" }
+                ],
+                fallbackTarget: "intro_silent"
+            },
+            axel_positive: {
+                speaker: "Axel",
+                color: colors.axel,
+                subtitle: "'That's what I'm talking about! We are gonna win that building competition easily!'",
+                background: "linear-gradient(0deg, #122b17 0%, #040d06 100%)",
+                hasChoices: false,
+                nextScene: "prepare_festival"
+            },
+            axel_panicked: {
+                speaker: "Axel",
+                color: colors.axel,
+                subtitle: "'Are you kidding me, Jesse?! The contest starts in like two hours! Grab your blocks now!'",
+                background: "linear-gradient(0deg, #3d1414 0%, #140404 100%)",
+                hasChoices: false,
+                nextScene: "prepare_festival"
+            },
+            olivia_locate: {
+                speaker: "Olivia",
+                color: colors.olivia,
+                subtitle: "'I'm right behind you guys. And honestly, looking at your inventories, I'm glad I brought backup redstone.'",
+                background: "linear-gradient(0deg, #2d2a16 0%, #0f0e07 100%)",
+                hasChoices: false,
+                nextScene: "prepare_festival"
+            },
+            intro_silent: {
+                speaker: "Axel",
+                color: colors.axel,
+                subtitle: "'Uh, Jesse? You're doing that weird zoning-out thing again. Come on, we're burning daylight!'",
+                background: "linear-gradient(0deg, #1a1a1a 0%, #0a0a0a 100%)",
+                hasChoices: false,
+                nextScene: "prepare_festival"
+            },
+            prepare_festival: {
+                speaker: "Narrator",
+                color: colors.narrator,
+                subtitle: "[Chapter 1: EnderCon Completed]\n\nYour GitHub engine works! The story will remember this configuration.",
+                background: "linear-gradient(135deg, #141419 0%, #22222b 100%)",
+                hasChoices: false,
+                nextScene: null
+            }
+        };
+
+        let currentSceneId = 'start';
+        let timerToken = null;
+
+        const sceneBg = document.getElementById('scene-bg');
+        const speakerTag = document.getElementById('speaker-name');
+        const subtitleText = document.getElementById('subtitle');
+        const hudOverlay = document.getElementById('hud');
+        const timerBar = document.getElementById('timer-bar');
+
+        const optTop = document.getElementById('opt-top');
